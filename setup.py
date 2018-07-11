@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(name='flanker',
-      version='0.1.0    ',
+      version='0.1.1',
       description='Thin Etcd3 client',
       long_description=open('README.md').read(),
       classifiers=[
@@ -26,7 +26,8 @@ setup(name='flanker',
       zip_safe=True,
       tests_require=[
           'nose',
-          'coverage'
+          'coverage',
+          'requests'
       ],
       install_requires=[
           'grpcio',

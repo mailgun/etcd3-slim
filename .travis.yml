@@ -8,14 +8,14 @@ env:
 
 before_install:
   - ./scripts/etcd_start.sh
-  - ./vagrant/etcd_init.sh
+  - ./scripts/etcd_init.sh
 
 install:
   - pip install -e .
   - pip install nose coverage coveralls
 
 script:
-  - nosetests --with-coverage --cover-package=etcd3
+  - nosetests -v --with-coverage --cover-package=etcd3
 
 after_success:
   - coveralls
