@@ -1,8 +1,8 @@
 from __future__ import absolute_import
 
-import os
 from time import sleep
 
+import os
 from nose.tools import eq_
 
 from etcd3 import (ENV_ETCD3_CA, ENV_ETCD3_ENDPOINT, ENV_ETCD3_PASSWORD,
@@ -52,10 +52,10 @@ def test_normal_operation():
     try:
         for i in range(3):
             sleep(ttl - 0.5)
-            eq_('bar', _proxied_clt.get_value('/test/foo'))
+            eq_(b'bar', _proxied_clt.get_value('/test/foo'))
 
     finally:
-        eq_(True, keep_aliver.stop(timeout=1))
+        eq_(True, keep_aliver.stop(timeout=3))
 
     eq_(None, _proxied_clt.get_value('/test/foo'))
 
@@ -71,7 +71,7 @@ def test_spin_pause_too_long():
     keep_aliver.start()
     try:
         sleep(ttl - 0.5)
-        eq_('bar', _proxied_clt.get_value('/test/foo'))
+        eq_(b'bar', _proxied_clt.get_value('/test/foo'))
 
     finally:
         eq_(True, keep_aliver.stop(timeout=3))
@@ -91,9 +91,9 @@ def test_auto_reconnect():
     keep_aliver.start()
     try:
         sleep(ttl - 0.5)
-        eq_('bar', _proxied_clt.get_value('/test/foo'))
+        eq_(b'bar', _proxied_clt.get_value('/test/foo'))
         sleep(ttl - 0.5)
-        eq_('bar', _proxied_clt.get_value('/test/foo'))
+        eq_(b'bar', _proxied_clt.get_value('/test/foo'))
 
         # If connection with Etcd is lost...
         _toxi_proxy_clt.update_proxy(_ETCD_PROXY, enabled=False)
@@ -106,12 +106,12 @@ def test_auto_reconnect():
 
         # Then: the key is automatically restored.
         sleep(0.5)
-        eq_('bar', _proxied_clt.get_value('/test/foo'))
+        eq_(b'bar', _proxied_clt.get_value('/test/foo'))
         sleep(ttl - 0.5)
-        eq_('bar', _proxied_clt.get_value('/test/foo'))
+        eq_(b'bar', _proxied_clt.get_value('/test/foo'))
 
     finally:
-        eq_(True, keep_aliver.stop(timeout=1))
+        eq_(True, keep_aliver.stop(timeout=3))
 
     eq_(None, _proxied_clt.get_value('/test/foo'))
 
@@ -138,11 +138,11 @@ def test_etcd_down_on_start():
 
         # Then: the key is automatically created.
         sleep(0.5)
-        eq_('bar', _proxied_clt.get_value('/test/foo'))
+        eq_(b'bar', _proxied_clt.get_value('/test/foo'))
         sleep(ttl - 0.5)
-        eq_('bar', _proxied_clt.get_value('/test/foo'))
+        eq_(b'bar', _proxied_clt.get_value('/test/foo'))
 
     finally:
-        eq_(True, keep_aliver.stop(timeout=1))
+        eq_(True, keep_aliver.stop(timeout=3))
 
     eq_(None, _proxied_clt.get_value('/test/foo'))

@@ -1,15 +1,15 @@
 from __future__ import absolute_import
 
-import os
-import re
-from contextlib import contextmanager
 from time import sleep
 
 import grpc
+import os
+import re
+from contextlib import contextmanager
 from nose.tools import eq_
 
 from etcd3 import (ENV_ETCD3_CA, ENV_ETCD3_ENDPOINT, ENV_ETCD3_PASSWORD,
-                   ENV_ETCD3_USER)
+                   ENV_ETCD3_USER, _utils)
 from etcd3._client import Client
 from tests.toxiproxy import ToxiProxyClient
 
@@ -128,9 +128,9 @@ def test_get_prefix():
 
     # Then
     eq_(3, rs.count)
-    eq_('bar2', rs.kvs[0].value)
-    eq_('bar3', rs.kvs[1].value)
-    eq_('bar4', rs.kvs[2].value)
+    eq_(b'bar2', rs.kvs[0].value)
+    eq_(b'bar3', rs.kvs[1].value)
+    eq_(b'bar4', rs.kvs[2].value)
 
 
 def test_auto_reconnect():
@@ -204,7 +204,7 @@ def _assert_get_one(want, range_rs):
         return
 
     eq_(1, range_rs.count, comment)
-    eq_(want, range_rs.kvs[0].value, comment)
+    eq_(_utils.to_bytes(want), range_rs.kvs[0].value, comment)
 
 
 def _assert_event(t, k, v, got):

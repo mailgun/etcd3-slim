@@ -3,7 +3,11 @@
 set -x
 
 export ETCDCTL_API=3
-ETCDCTL="etcdctl --endpoints=https://127.0.0.1:2379 --insecure-transport=false --insecure-skip-tls-verify=true"
+
+KERNEL_NAME=$(uname -s | awk '{print tolower($0)}')
+ETCD3_DIST=etcd-${ETCD3_VERSION}-${KERNEL_NAME}-amd64
+WORKSPACE_DIR=tests/.workspace
+ETCDCTL="${WORKSPACE_DIR}/${ETCD3_DIST}/etcdctl --endpoints=https://127.0.0.1:2379 --insecure-transport=false --insecure-skip-tls-verify=true"
 
 ${ETCDCTL} role add test
 ${ETCDCTL} role list
