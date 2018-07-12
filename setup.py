@@ -2,8 +2,8 @@
 
 from setuptools import setup, find_packages
 
-setup(name='flanker',
-      version='0.1.1',
+setup(name='etcd3-slim',
+      version='0.1.2',
       description='Thin Etcd3 client',
       long_description=open('README.md').read(),
       classifiers=[

@@ -105,7 +105,7 @@ def test_auto_reconnect():
         _toxi_proxy_clt.update_proxy(_ETCD_PROXY, enabled=True)
 
         # Then: the key is automatically restored.
-        sleep(0.5)
+        sleep(2)
         eq_(b'bar', _proxied_clt.get_value('/test/foo'))
         sleep(ttl - 0.5)
         eq_(b'bar', _proxied_clt.get_value('/test/foo'))
