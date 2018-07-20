@@ -10,7 +10,6 @@ WORKSPACE_DIR=tests/.workspace
 ETCDCTL="${WORKSPACE_DIR}/${ETCD3_DIST}/etcdctl --endpoints=https://127.0.0.1:2379 --insecure-transport=false --insecure-skip-tls-verify=true"
 
 ${ETCDCTL} role add test
-${ETCDCTL} role list
 ${ETCDCTL} user add root:root
 ${ETCDCTL} user add test:test
 ${ETCDCTL} user grant-role test test

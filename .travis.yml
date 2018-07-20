@@ -3,8 +3,9 @@ python:
   - 2.7
   - 3.6
 env:
-  global:
-    ETCD3_VERSION=v3.2.23
+  matrix:
+    - ETCD3_VERSION=v3.2.23
+    - ETCD3_VERSION=v3.3.8
 
 before_install:
   - ./scripts/etcd_start.sh
