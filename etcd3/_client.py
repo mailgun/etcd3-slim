@@ -40,11 +40,13 @@ def _reconnect(f):
 
 class Client(object):
 
-    def __init__(self, endpoint, user, password, cert_ca=None, timeout=None):
+    def __init__(self, endpoint, user, password, cert=None, cert_key=None,
+                 cert_ca=None, timeout=None):
         self._endpoint = endpoint
         self._user = user
         self._password = password
-        self._ssl_creds = grpc.ssl_channel_credentials(_read_file(cert_ca))
+        self._ssl_creds = grpc.ssl_channel_credentials(
+            _read_file(cert_ca), _read_file(cert_key), _read_file(cert))
         self._timeout = timeout or _DEFAULT_REQUEST_TIMEOUT
 
         self._grpc_channel_mu = Lock()
