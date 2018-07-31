@@ -25,6 +25,10 @@ def client():
         return _clt
 
     endpoint = os.getenv(ENV_ETCD3_ENDPOINT, '127.0.0.1:2379')
+    # Remove the schema if it exists (http://|https://)
+    if '//' in endpoint:
+        endpoint = endpoint.split('//')[1]
+
     user = os.getenv(ENV_ETCD3_USER)
     password = os.getenv(ENV_ETCD3_PASSWORD)
     cert_ca = os.getenv(ENV_ETCD3_CA)
