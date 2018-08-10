@@ -79,9 +79,14 @@ class KeepAliver(object):
     
         if lease_id:
             try:
-                self._client.lease_revoke(lease_id)
                 self._client.delete(self._key)
-    
+
+            except Exception:
+                _log.exception('Failed to delete key: %s', self._key)
+
+            try:
+                self._client.lease_revoke(lease_id)
+
             except Exception:
                 _log.exception('Failed to revoke lease: %s', lease_id)
 
