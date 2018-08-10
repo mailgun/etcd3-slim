@@ -81,9 +81,7 @@ class GrpcBDStream(object):
         while True:
             rq = self._requests.get()
             if rq is None:
-                # FIXME: Raising a RuntimeException here is the only sure way
-                # FIXME: to make gRCP terminate the response iterator.
-                raise RuntimeError('%s terminating' % (self._name,))
+                return
 
             yield rq
 
