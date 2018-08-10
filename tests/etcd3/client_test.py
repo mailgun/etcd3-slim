@@ -145,7 +145,8 @@ def test_auto_reconnect():
     with _assert_raises_grpc_error(grpc.StatusCode.UNAVAILABLE,
                                    '(OS Error)|'
                                    '(Socket closed)|'
-                                   '(Transport closed)'):
+                                   '(Transport closed)|'
+                                   '(Connect Failed)'):
         _etcd3_clt.put('/test/foo', 'bazz1')
 
     # When: etcd gets back in service
