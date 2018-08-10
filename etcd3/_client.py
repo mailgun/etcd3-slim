@@ -107,6 +107,14 @@ class Client(object):
     def new_keep_aliver(self, key, value, ttl, spin_pause=None):
         return KeepAliver(self, key, value, ttl, spin_pause)
 
+    @_reconnect
+    def _get_watch_stub(self):
+        return self._watch_stub
+
+    @_reconnect
+    def _get_lease_stub(self):
+        return self._lease_stub
+
     def _ensure_grpc_channel(self):
         with self._grpc_channel_mu:
             if self._grpc_channel:
