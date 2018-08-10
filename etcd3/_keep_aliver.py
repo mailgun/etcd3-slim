@@ -57,7 +57,6 @@ class KeepAliver(object):
                 continue
 
             effective_spin_pause = min(refresh_interval, self._spin_pause)
-            print('***', effective_spin_pause)
             try:
                 refresh_at = time() + refresh_interval
                 while not self._stop:
