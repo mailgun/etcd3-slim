@@ -46,18 +46,18 @@ def test_normal_operation():
     _proxied_clt.delete('/test')
 
     ttl = 2
-    keep_aliver = _proxied_clt.new_keep_aliver('/test/foo', 'bar', ttl,
+    keep_aliver = _proxied_clt.new_keep_aliver('/test/keep-alive-0', 'bar', ttl,
                                                spin_pause=0.2)
     keep_aliver.start()
     try:
         for i in range(3):
             sleep(ttl - 0.5)
-            eq_(b'bar', _proxied_clt.get_value('/test/foo'))
+            eq_(b'bar', _proxied_clt.get_value('/test/keep-alive-0'))
 
     finally:
         eq_(True, keep_aliver.stop(timeout=3))
 
-    eq_(None, _proxied_clt.get_value('/test/foo'))
+    eq_(None, _proxied_clt.get_value('/test/keep-alive-0'))
 
 
 def test_spin_pause_too_long():
@@ -66,17 +66,17 @@ def test_spin_pause_too_long():
     _proxied_clt.delete('/test')
 
     ttl = 3
-    keep_aliver = _proxied_clt.new_keep_aliver('/test/foo', 'bar', ttl,
+    keep_aliver = _proxied_clt.new_keep_aliver('/test/keep-alive-1', 'bar', ttl,
                                                spin_pause=10)
     keep_aliver.start()
     try:
         sleep(ttl - 0.5)
-        eq_(b'bar', _proxied_clt.get_value('/test/foo'))
+        eq_(b'bar', _proxied_clt.get_value('/test/keep-alive-1'))
 
     finally:
         eq_(True, keep_aliver.stop(timeout=3))
 
-    eq_(None, _proxied_clt.get_value('/test/foo'))
+    eq_(None, _proxied_clt.get_value('/test/keep-alive-1'))
 
 
 def test_auto_reconnect():
@@ -86,34 +86,34 @@ def test_auto_reconnect():
     _proxied_clt.delete('/test')
 
     ttl = 2
-    keep_aliver = _proxied_clt.new_keep_aliver('/test/foo', 'bar', ttl,
+    keep_aliver = _proxied_clt.new_keep_aliver('/test/keep-alive-2', 'bar', ttl,
                                                spin_pause=0.2)
     keep_aliver.start()
     try:
         sleep(ttl - 0.5)
-        eq_(b'bar', _proxied_clt.get_value('/test/foo'))
+        eq_(b'bar', _proxied_clt.get_value('/test/keep-alive-2'))
         sleep(ttl - 0.5)
-        eq_(b'bar', _proxied_clt.get_value('/test/foo'))
+        eq_(b'bar', _proxied_clt.get_value('/test/keep-alive-2'))
 
         # If connection with Etcd is lost...
         _toxi_proxy_clt.update_proxy(_ETCD_PROXY, enabled=False)
         # ...the key expires
         sleep(ttl + 0.5)
-        eq_(None, _direct_clt.get_value('/test/foo'))
+        eq_(None, _direct_clt.get_value('/test/keep-alive-2'))
 
         # When: etcd gets back in service
         _toxi_proxy_clt.update_proxy(_ETCD_PROXY, enabled=True)
 
         # Then: the key is automatically restored.
         sleep(2)
-        eq_(b'bar', _proxied_clt.get_value('/test/foo'))
+        eq_(b'bar', _proxied_clt.get_value('/test/keep-alive-2'))
         sleep(ttl - 0.5)
-        eq_(b'bar', _proxied_clt.get_value('/test/foo'))
+        eq_(b'bar', _proxied_clt.get_value('/test/keep-alive-2'))
 
     finally:
         eq_(True, keep_aliver.stop(timeout=3))
 
-    eq_(None, _proxied_clt.get_value('/test/foo'))
+    eq_(None, _proxied_clt.get_value('/test/keep-alive-2'))
 
 
 def test_etcd_down_on_start():
@@ -123,7 +123,7 @@ def test_etcd_down_on_start():
     _proxied_clt.delete('/test')
 
     ttl = 2
-    keep_aliver = _proxied_clt.new_keep_aliver('/test/foo', 'bar', ttl,
+    keep_aliver = _proxied_clt.new_keep_aliver('/test/keep-alive-3', 'bar', ttl,
                                                spin_pause=0.2)
     # Simulate Etcd down on start.
     _toxi_proxy_clt.update_proxy(_ETCD_PROXY, enabled=False)
@@ -131,18 +131,18 @@ def test_etcd_down_on_start():
     keep_aliver.start()
     try:
         sleep(0.5)
-        eq_(None, _direct_clt.get_value('/test/foo'))
+        eq_(None, _direct_clt.get_value('/test/keep-alive-3'))
 
         # When: etcd gets back in service.
         _toxi_proxy_clt.update_proxy(_ETCD_PROXY, enabled=True)
 
         # Then: the key is automatically created.
         sleep(0.5)
-        eq_(b'bar', _proxied_clt.get_value('/test/foo'))
+        eq_(b'bar', _proxied_clt.get_value('/test/keep-alive-3'))
         sleep(ttl - 0.5)
-        eq_(b'bar', _proxied_clt.get_value('/test/foo'))
+        eq_(b'bar', _proxied_clt.get_value('/test/keep-alive-3'))
 
     finally:
         eq_(True, keep_aliver.stop(timeout=3))
 
-    eq_(None, _proxied_clt.get_value('/test/foo'))
+    eq_(None, _proxied_clt.get_value('/test/keep-alive-3'))
