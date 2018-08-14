@@ -5,7 +5,7 @@ from threading import Thread
 from time import sleep, time
 
 from etcd3._grpc_bd_stream import GrpcBDStream
-from etcd3._grpc_stubs.rpc_pb2 import LeaseKeepAliveRequest, LeaseStub
+from etcd3._grpc_stubs.rpc_pb2 import LeaseKeepAliveRequest
 
 _DEFAULT_SPIN_PAUSE = 3  # seconds
 
@@ -48,7 +48,7 @@ class KeepAliver(object):
                 _log.debug('Volatile key stored: %s, value=%s, ttl=%d, ',
                            self._key, self._value, lease_grant_rs.TTL)
 
-                lease_stub = LeaseStub(self._client._grpc_channel)
+                lease_stub = self._client._get_lease_stub()
                 grpc_stream = GrpcBDStream(self._name + '_stream',
                                            lease_stub.LeaseKeepAlive)
             except Exception:
@@ -79,9 +79,14 @@ class KeepAliver(object):
     
         if lease_id:
             try:
-                self._client.lease_revoke(lease_id)
                 self._client.delete(self._key)
-    
+
+            except Exception:
+                _log.exception('Failed to delete key: %s', self._key)
+
+            try:
+                self._client.lease_revoke(lease_id)
+
             except Exception:
                 _log.exception('Failed to revoke lease: %s', lease_id)
 

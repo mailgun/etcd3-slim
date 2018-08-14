@@ -29,7 +29,12 @@ def _reconnect(f):
         assert isinstance(etcd3_clt, Client)
         etcd3_clt._ensure_grpc_channel()
         try:
-            return f(*args, **kwargs)
+            try:
+                return f(*args, **kwargs)
+
+            except grpc.RpcError:
+                etcd3_clt._reset_grpc_channel()
+                return f(*args, **kwargs)
 
         except Exception:
             etcd3_clt._close_grpc_channel()
@@ -107,26 +112,45 @@ class Client(object):
     def new_keep_aliver(self, key, value, ttl, spin_pause=None):
         return KeepAliver(self, key, value, ttl, spin_pause)
 
+    @_reconnect
+    def _get_watch_stub(self):
+        return self._watch_stub
+
+    @_reconnect
+    def _get_lease_stub(self):
+        return self._lease_stub
+
     def _ensure_grpc_channel(self):
         with self._grpc_channel_mu:
-            if self._grpc_channel:
-                return
-
-            self._grpc_channel = self._dial()
-            self._kv_stub = KVStub(self._grpc_channel)
-            self._watch_stub = WatchStub(self._grpc_channel)
-            self._lease_stub = LeaseStub(self._grpc_channel)
+            self._ensure_grpc_channel_unsafe()
 
     def _close_grpc_channel(self):
         with self._grpc_channel_mu:
-            if not self._grpc_channel:
-                return
-            try:
-                self._grpc_channel.close()
-            except Exception:
-                _log.exception('Failed to close Etcd client gRPC channel')
+            self._close_grpc_channel_unsafe()
 
-            self._grpc_channel = None
+    def _reset_grpc_channel(self):
+        with self._grpc_channel_mu:
+            self._close_grpc_channel_unsafe()
+            self._ensure_grpc_channel_unsafe()
+
+    def _ensure_grpc_channel_unsafe(self):
+        if self._grpc_channel:
+            return
+
+        self._grpc_channel = self._dial()
+        self._kv_stub = KVStub(self._grpc_channel)
+        self._watch_stub = WatchStub(self._grpc_channel)
+        self._lease_stub = LeaseStub(self._grpc_channel)
+
+    def _close_grpc_channel_unsafe(self):
+        if not self._grpc_channel:
+            return
+        try:
+            self._grpc_channel.close()
+        except Exception:
+            _log.exception('Failed to close Etcd client gRPC channel')
+
+        self._grpc_channel = None
 
     def _dial(self):
         token = self._authenticate()

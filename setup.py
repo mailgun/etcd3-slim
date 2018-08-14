@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(name='etcd3-slim',
-      version='0.1.5',
+      version='0.1.6',
       description='Thin Etcd3 client',
       long_description=open('README.md').read(),
       classifiers=[

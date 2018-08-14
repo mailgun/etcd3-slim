@@ -5,8 +5,7 @@ from threading import Thread
 
 from etcd3 import _utils
 from etcd3._grpc_bd_stream import GrpcBDStream
-from etcd3._grpc_stubs.rpc_pb2 import (WatchCreateRequest, WatchRequest,
-                                       WatchStub)
+from etcd3._grpc_stubs.rpc_pb2 import WatchCreateRequest, WatchRequest
 
 _DEFAULT_SPIN_PAUSE = 3  # seconds
 
@@ -49,7 +48,7 @@ class Watcher(object):
         _log.info('%s started', self._name)
         start_revision = None
         while not self._stop:
-            watch_stub = WatchStub(self._client._grpc_channel)
+            watch_stub = self._client._get_watch_stub()
             grpc_stream = GrpcBDStream(self._name + '_stream', watch_stub.Watch)
             if start_revision:
                 self._watch_rq.create_request.start_revision = start_revision
