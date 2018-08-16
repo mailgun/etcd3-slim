@@ -33,6 +33,7 @@ def _reconnect(f):
                 return f(*args, **kwargs)
 
             except grpc.RpcError:
+                _log.exception('Retrying error: %s(*%s, **%s)', f, args, kwargs)
                 etcd3_clt._reset_grpc_channel()
                 return f(*args, **kwargs)
 

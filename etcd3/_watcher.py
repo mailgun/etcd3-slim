@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import logging
 from threading import Thread
+from time import sleep
 
 from etcd3 import _utils
 from etcd3._grpc_bd_stream import GrpcBDStream
@@ -48,17 +49,28 @@ class Watcher(object):
         _log.info('%s started', self._name)
         start_revision = None
         while not self._stop:
-            watch_stub = self._client._get_watch_stub()
-            grpc_stream = GrpcBDStream(self._name + '_stream', watch_stub.Watch)
-            if start_revision:
-                self._watch_rq.create_request.start_revision = start_revision
+            try:
+                watch_stub = self._client._get_watch_stub()
+                grpc_stream = GrpcBDStream(self._name + '_stream',
+                                           watch_stub.Watch)
+                if start_revision:
+                    self._watch_rq.create_request.start_revision = start_revision
 
-            grpc_stream.send(self._watch_rq, self._client._timeout)
+                grpc_stream.send(self._watch_rq, self._client._timeout)
+
+            except Exception:
+                _log.exception('Failed to initialize watch: %s', self._key)
+                sleep(self._spin_pause)
+                continue
+
             try:
                 while not self._stop:
                     rs = grpc_stream.recv(self._spin_pause)
                     if not rs:
                         continue
+
+                    if rs.created:
+                        _log.info('Watch created: %s', self._key)
 
                     for e in rs.events:
                         start_revision = e.kv.mod_revision + 1
@@ -70,6 +82,7 @@ class Watcher(object):
 
             except Exception:
                 _log.exception('Watch stream failed: %s', self._key)
+                sleep(self._spin_pause)
 
             finally:
                 grpc_stream.close(self._client._timeout)

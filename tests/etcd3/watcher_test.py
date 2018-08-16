@@ -169,9 +169,9 @@ def test_auto_reconnect():
 
         # But as soon as connection with Etcd is restored...
         _toxi_proxy_clt.update_proxy(_ETCD_PROXY, enabled=True)
-        sleep(0.5)
+
         # ...backed up events are received
-        events = _collect_events(watch_queue, timeout=3)
+        events = _collect_events(watch_queue, timeout=5)
         eq_(3, len(events))
         _assert_event(Event.PUT, '/test/foo', 'bar3', events[0])
         _assert_event(Event.DELETE, '/test/foo', '', events[1])
@@ -206,9 +206,9 @@ def test_etcd_down_on_start():
 
         # But as soon as connection with Etcd is restored...
         _toxi_proxy_clt.update_proxy(_ETCD_PROXY, enabled=True)
-        sleep(0.5)
+
         # ...backed up events are received
-        events = _collect_events(watch_queue, timeout=3)
+        events = _collect_events(watch_queue, timeout=5)
         eq_(3, len(events))
         _assert_event(Event.PUT, '/test/foo', 'bar1', events[0])
         _assert_event(Event.DELETE, '/test/foo', '', events[1])
