@@ -2,6 +2,9 @@
 
 set -x
 
+SCRIPT_DIR="$(dirname $0)"
+source ${SCRIPT_DIR}/defaults.sh
+
 export ETCDCTL_API=3
 
 KERNEL_NAME=$(uname -s | awk '{print tolower($0)}')
