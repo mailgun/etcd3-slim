@@ -9,6 +9,7 @@ env:
 
 before_install:
   - ./scripts/etcd_start.sh
+  - sleep 5
   - ./scripts/etcd_init.sh
 
 install:

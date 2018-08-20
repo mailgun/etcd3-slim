@@ -19,6 +19,7 @@ class Watcher(object):
                  start_revision=0, spin_pause=None):
         self._client = client
         self._key = key
+        self._is_prefix = is_prefix
         self._start_revision = start_revision
         self._event_handler = event_handler
         self._spin_pause = spin_pause or _DEFAULT_SPIN_PAUSE
@@ -50,6 +51,10 @@ class Watcher(object):
         start_revision = None
         while not self._stop:
             try:
+                # Test if the key can be accessed. That is needed to trigger
+                # reconnects and also checks if there is enough permissions.
+                self._client.get(self._key, self._is_prefix)
+
                 watch_stub = self._client._get_watch_stub()
                 grpc_stream = GrpcBDStream(self._name + '_stream',
                                            watch_stub.Watch)
