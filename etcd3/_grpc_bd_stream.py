@@ -26,7 +26,7 @@ class GrpcBDStream(object):
             self._requests.put(rq, timeout=timeout)
 
         except queue.Full:
-            raise RuntimeError('%s request submit timeout' % (self._name,))
+            raise RuntimeError('%s request queue full' % (self._name,))
 
     def recv(self, timeout=None):
         try:
@@ -35,7 +35,7 @@ class GrpcBDStream(object):
                 with self._closed_mu:
                     self._closed = True
 
-                raise RuntimeError('%s closed by server' % (self._name,))
+                raise RuntimeError('%s closed unexpectedly' % (self._name,))
 
             if isinstance(rs, Exception):
                 with self._closed_mu:
@@ -55,24 +55,27 @@ class GrpcBDStream(object):
         try:
             self._requests.put(None, timeout=timeout)
         except queue.Full:
-            _log.error('[%s] timed out on close request', self._name)
+            _log.error('Request queue full: %s', self._name)
             return
 
         try:
-            # Drain unhandled responses
+            # Drain unhandled responses. This is necessary to allow the request
+            # thread to unblock and terminate gracefully.
             while True:
                 rs = self._responses.get(timeout=timeout)
                 if rs is None:
                     break
 
                 if isinstance(rs, Exception):
-                    _log.info('[%s] error discarded: %s', self._name, rs)
+                    _log.info('Error discarded on close: %s, err=%s',
+                              self._name, rs)
                     break
 
-                _log.info('[%s] response discarded: %s', self._name, rs)
+                _log.info('Response discarded on close: %s, rs=%s',
+                          self._name, rs)
 
         except queue.Empty:
-            _log.error('[%s] timed out draining responses', self._name)
+            _log.warn('Timed out draining responses: %s', self._name)
 
         with self._closed_mu:
             self._closed = True
@@ -81,12 +84,13 @@ class GrpcBDStream(object):
         while True:
             rq = self._requests.get()
             if rq is None:
+                _log.info('Request iterator terminated: %s', self._name)
                 return
 
             yield rq
 
     def _run(self):
-        _log.info('[%s] thread started', self._name)
+        _log.info('Response thread started: %s', self._name)
         try:
             for rs in self._response_iter:
                 self._responses.put(rs)
@@ -96,4 +100,4 @@ class GrpcBDStream(object):
         except Exception as err:
             self._responses.put(err)
 
-        _log.info('[%s] thread stopped', self._name)
+        _log.info('Response thread stopped: %s', self._name)
