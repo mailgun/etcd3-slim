@@ -32,8 +32,14 @@ def _reconnect(f):
             try:
                 return f(*args, **kwargs)
 
-            except grpc.RpcError:
-                _log.exception('Retrying error: %s(*%s, **%s)', f, args, kwargs)
+            except grpc.RpcError as err:
+                severity = logging.ERROR
+                if (err.code() == grpc.StatusCode.UNAUTHENTICATED and
+                        err.details().endswith('invalid auth token')):
+                    severity = logging.WARN
+
+                _log.log(severity, 'Retrying error: %s(*%s, **%s)',
+                         f, args, kwargs, exc_info=True)
                 etcd3_clt._reset_grpc_channel()
                 return f(*args, **kwargs)
 
