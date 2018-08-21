@@ -2,66 +2,35 @@ from __future__ import absolute_import
 
 from time import sleep
 
-import os
-from nose.tools import eq_
+from nose.tools import eq_, with_setup, assert_not_equal
 from six.moves import queue
 
-from etcd3 import (ENV_ETCD3_CA, ENV_ETCD3_ENDPOINT, ENV_ETCD3_PASSWORD,
-                   ENV_ETCD3_USER, _utils)
-from etcd3._client import Client
+from etcd3 import _utils
 from etcd3._grpc_stubs.kv_pb2 import Event
-from tests.toxiproxy import ToxiProxyClient
-
-_ETCD_PROXY = 'etcd'
+from tests.etcd3 import _fixture
 
 
-def setup_module():
-    global _toxi_proxy_clt
-    _toxi_proxy_clt = ToxiProxyClient()
-    _toxi_proxy_clt.start()
-
-    etcd_endpoint = os.getenv(ENV_ETCD3_ENDPOINT, '127.0.0.1:2379')
-    user = os.getenv(ENV_ETCD3_USER, 'test')
-    password = os.getenv(ENV_ETCD3_PASSWORD, 'test')
-    cert_ca = os.getenv(ENV_ETCD3_CA, 'tests/fixtures/ca.pem')
-
-    global _direct_clt
-    _direct_clt = Client(etcd_endpoint, user, password, cert_ca=cert_ca)
-
-    proxy_spec = _toxi_proxy_clt.add_proxy(_ETCD_PROXY, etcd_endpoint)
-    proxy_endpoint = proxy_spec['listen']
-    # Make sure to access proxy via 127.0.0.1 otherwise TLS verification fails.
-    if proxy_endpoint.startswith('[::]:'):
-        proxy_endpoint = '127.0.0.1:' + proxy_endpoint[5:]
-
-    global _proxied_clt
-    _proxied_clt = Client(proxy_endpoint, user, password, cert_ca=cert_ca)
-
-
-def teardown_module():
-    _toxi_proxy_clt.stop()
-
-
+@with_setup(_fixture.setup, _fixture.teardown)
 def test_watch_key():
-    _proxied_clt.delete('/test')
+    proxied_clt = _fixture.proxied_clt()
     watch_queue = queue.Queue()
 
-    _proxied_clt.put('/test/foo2', 'bar1')
-    w = _proxied_clt.new_watcher('/test/foo2', spin_pause=0.2,
-                                 event_handler=lambda e: watch_queue.put(e))
+    proxied_clt.put('/test/foo2', 'bar1')
+    w = proxied_clt.new_watcher('/test/foo2', spin_pause=0.2,
+                                event_handler=lambda e: watch_queue.put(e))
     w.start()
     try:
         sleep(0.5)
 
         # When
-        _proxied_clt.put('/test/foo1', 'bar2')
-        _proxied_clt.put('/test/foo3', 'bar5')
-        _proxied_clt.put('/test/foo2', 'bar6')
-        _proxied_clt.put('/test/foo21', 'bar7')
-        _proxied_clt.delete('/test/foo2')
-        _proxied_clt.put('/test/foo212', 'bar8')
-        _proxied_clt.put('/test/foo2', 'bar9')
-        _proxied_clt.put('/test/foo21', 'bar10')
+        proxied_clt.put('/test/foo1', 'bar2')
+        proxied_clt.put('/test/foo3', 'bar5')
+        proxied_clt.put('/test/foo2', 'bar6')
+        proxied_clt.put('/test/foo21', 'bar7')
+        proxied_clt.delete('/test/foo2')
+        proxied_clt.put('/test/foo212', 'bar8')
+        proxied_clt.put('/test/foo2', 'bar9')
+        proxied_clt.put('/test/foo21', 'bar10')
 
         # Then
         events = _collect_events(watch_queue, timeout=3)
@@ -74,25 +43,26 @@ def test_watch_key():
         w.stop(timeout=1)
 
 
+@with_setup(_fixture.setup, _fixture.teardown)
 def test_watch_key_prefix():
-    _proxied_clt.delete('/test')
+    proxied_clt = _fixture.proxied_clt()
     watch_queue = queue.Queue()
 
-    _proxied_clt.put('/test/foo2', 'bar1')
-    w = _proxied_clt.new_watcher('/test/foo2', is_prefix=True, spin_pause=0.2,
-                                 event_handler=lambda e: watch_queue.put(e))
+    proxied_clt.put('/test/foo2', 'bar1')
+    w = proxied_clt.new_watcher('/test/foo2', is_prefix=True, spin_pause=0.2,
+                                event_handler=lambda e: watch_queue.put(e))
     w.start()
     try:
         sleep(0.5)
 
         # When
-        _proxied_clt.put('/test/foo1', 'bar6')
-        _proxied_clt.put('/test/foo21', 'bar7')
-        _proxied_clt.delete('/test/foo2')
-        _proxied_clt.put('/test/foo212', 'bar8')
-        _proxied_clt.delete('/test/foo1')
-        _proxied_clt.put('/test/foo21', 'bar10')
-        _proxied_clt.put('/test/foo3', 'bar11')
+        proxied_clt.put('/test/foo1', 'bar6')
+        proxied_clt.put('/test/foo21', 'bar7')
+        proxied_clt.delete('/test/foo2')
+        proxied_clt.put('/test/foo212', 'bar8')
+        proxied_clt.delete('/test/foo1')
+        proxied_clt.put('/test/foo21', 'bar10')
+        proxied_clt.put('/test/foo3', 'bar11')
 
         # Then
         events = _collect_events(watch_queue, timeout=3)
@@ -106,26 +76,27 @@ def test_watch_key_prefix():
         w.stop(timeout=1)
 
 
+@with_setup(_fixture.setup, _fixture.teardown)
 def test_watch_from_the_past():
     # A revision to start watching from can be specified.
 
-    _proxied_clt.delete('/test')
+    proxied_clt = _fixture.proxied_clt()
     watch_queue = queue.Queue()
 
-    _proxied_clt.put('/test/foo2', 'bar1')
-    _proxied_clt.put('/test/foo2', 'bar2')
-    put_rs = _proxied_clt.put('/test/foo2', 'bar3')
-    _proxied_clt.put('/test/foo2', 'bar4')
-    _proxied_clt.put('/test/foo2', 'bar5')
-    _proxied_clt.put('/test/foo3', 'bar6')
+    proxied_clt.put('/test/foo2', 'bar1')
+    proxied_clt.put('/test/foo2', 'bar2')
+    put_rs = proxied_clt.put('/test/foo2', 'bar3')
+    proxied_clt.put('/test/foo2', 'bar4')
+    proxied_clt.put('/test/foo2', 'bar5')
+    proxied_clt.put('/test/foo3', 'bar6')
 
     # When
-    w = _proxied_clt.new_watcher('/test/foo2', spin_pause=0.2,
-                                 start_revision=put_rs.header.revision,
-                                 event_handler=lambda e: watch_queue.put(e))
+    w = proxied_clt.new_watcher('/test/foo2', spin_pause=0.2,
+                                start_revision=put_rs.header.revision,
+                                event_handler=lambda e: watch_queue.put(e))
     w.start()
     try:
-        _proxied_clt.delete('/test/foo2')
+        proxied_clt.delete('/test/foo2')
 
         # Then
         events = _collect_events(watch_queue, timeout=3)
@@ -139,39 +110,82 @@ def test_watch_from_the_past():
         w.stop(timeout=1)
 
 
-def test_auto_reconnect():
-    # A revision to start watching from can be specified.
+@with_setup(_fixture.setup, _fixture.teardown)
+def test_auto_reconnect_node():
+    # Watch is restored even after a cluster wide outage.
 
-    _proxied_clt.delete('/test')
+    proxied_clt = _fixture.proxied_clt()
     watch_queue = queue.Queue()
 
-    put_rs = _direct_clt.put('/test/foo', 'bar0')
-    w = _proxied_clt.new_watcher('/test/foo', spin_pause=0.2,
-                                 start_revision=put_rs.header.revision + 1,
-                                 event_handler=lambda e: watch_queue.put(e))
+    put_rs = _fixture.aux_clt().put('/test/foo', 'bar0')
+    w = proxied_clt.new_watcher('/test/foo', spin_pause=0.2,
+                                start_revision=put_rs.header.revision + 1,
+                                event_handler=lambda e: watch_queue.put(e))
     w.start()
     try:
-        _direct_clt.put('/test/foo', 'bar1')
-        _direct_clt.put('/test/foo', 'bar2')
+        _fixture.aux_clt().put('/test/foo', 'bar1')
+        events = _collect_events(watch_queue, timeout=3)
+        eq_(1, len(events))
+
+        orig_endpoint = proxied_clt.current_endpoint
+        _fixture.aux_clt().put('/test/foo', 'bar2')
+        _fixture.aux_clt().put('/test/foo', 'bar3')
+        _fixture.aux_clt().put('/test/foo', 'bar4')
+        events = _collect_events(watch_queue, timeout=3)
+        eq_(3, len(events))
+        eq_(orig_endpoint, proxied_clt.current_endpoint)
+
+        # When
+        _fixture.disable_endpoint(orig_endpoint)
+
+        # Then: immediately reconnected to another endpoint.
+        _fixture.aux_clt().delete('/test/foo')
+        _fixture.aux_clt().put('/test/foo', 'bar5')
+        events = _collect_events(watch_queue, timeout=3)
+        eq_(2, len(events))
+        _assert_event(Event.DELETE, '/test/foo', '', events[0])
+        _assert_event(Event.PUT, '/test/foo', 'bar5', events[1])
+
+        assert_not_equal(orig_endpoint, proxied_clt.current_endpoint)
+
+    finally:
+        w.stop(timeout=1)
+
+
+@with_setup(_fixture.setup, _fixture.teardown)
+def test_auto_reconnect_outage():
+    # Watch is restored even after a cluster wide outage.
+
+    proxied_clt = _fixture.proxied_clt()
+    watch_queue = queue.Queue()
+
+    put_rs = _fixture.aux_clt().put('/test/foo', 'bar0')
+    w = proxied_clt.new_watcher('/test/foo', spin_pause=0.2,
+                                start_revision=put_rs.header.revision + 1,
+                                event_handler=lambda e: watch_queue.put(e))
+    w.start()
+    try:
+        _fixture.aux_clt().put('/test/foo', 'bar1')
+        _fixture.aux_clt().put('/test/foo', 'bar2')
         sleep(0.5)
 
         # When connection with Etcd is lost...
-        _toxi_proxy_clt.update_proxy(_ETCD_PROXY, enabled=False)
+        _fixture.disable_all_endpoints()
 
         # New events stop coming.
-        _direct_clt.put('/test/foo', 'bar3')
-        _direct_clt.delete('/test/foo')
-        _direct_clt.put('/test/foo', 'bar4')
+        _fixture.aux_clt().put('/test/foo', 'bar3')
+        _fixture.aux_clt().delete('/test/foo')
+        _fixture.aux_clt().put('/test/foo', 'bar4')
         events = _collect_events(watch_queue, timeout=3)
         eq_(2, len(events))
         _assert_event(Event.PUT, '/test/foo', 'bar1', events[0])
         _assert_event(Event.PUT, '/test/foo', 'bar2', events[1])
 
-        # But as soon as connection with Etcd is restored...
-        _toxi_proxy_clt.update_proxy(_ETCD_PROXY, enabled=True)
-        sleep(0.5)
+        # But as soon as the cluster is back in service...
+        _fixture.enabled_all_endpoints()
+
         # ...backed up events are received
-        events = _collect_events(watch_queue, timeout=3)
+        events = _collect_events(watch_queue, timeout=5)
         eq_(3, len(events))
         _assert_event(Event.PUT, '/test/foo', 'bar3', events[0])
         _assert_event(Event.DELETE, '/test/foo', '', events[1])
@@ -181,23 +195,24 @@ def test_auto_reconnect():
         w.stop(timeout=1)
 
 
+@with_setup(_fixture.setup, _fixture.teardown)
 def test_etcd_down_on_start():
     # If connection with Etcd cannot be established when a watch is started,
     # then events are received as soon as the connection is up.
 
-    _proxied_clt.delete('/test')
+    proxied_clt = _fixture.proxied_clt()
     watch_queue = queue.Queue()
 
-    put_rs = _proxied_clt.put('/test/foo', 'bar1')
-    _proxied_clt.delete('/test/foo')
-    _proxied_clt.put('/test/foo', 'bar2')
+    put_rs = proxied_clt.put('/test/foo', 'bar1')
+    proxied_clt.delete('/test/foo')
+    proxied_clt.put('/test/foo', 'bar2')
 
-    w = _proxied_clt.new_watcher('/test/foo', spin_pause=0.2,
-                                 start_revision=put_rs.header.revision,
-                                 event_handler=lambda e: watch_queue.put(e))
+    w = proxied_clt.new_watcher('/test/foo', spin_pause=0.2,
+                                start_revision=put_rs.header.revision,
+                                event_handler=lambda e: watch_queue.put(e))
 
     # When connection with Etcd is lost...
-    _toxi_proxy_clt.update_proxy(_ETCD_PROXY, enabled=False)
+    _fixture.disable_all_endpoints()
 
     w.start()
     try:
@@ -205,10 +220,10 @@ def test_etcd_down_on_start():
         eq_(0, len(events))
 
         # But as soon as connection with Etcd is restored...
-        _toxi_proxy_clt.update_proxy(_ETCD_PROXY, enabled=True)
-        sleep(0.5)
+        _fixture.enabled_all_endpoints()
+
         # ...backed up events are received
-        events = _collect_events(watch_queue, timeout=3)
+        events = _collect_events(watch_queue, timeout=5)
         eq_(3, len(events))
         _assert_event(Event.PUT, '/test/foo', 'bar1', events[0])
         _assert_event(Event.DELETE, '/test/foo', '', events[1])
@@ -218,10 +233,11 @@ def test_etcd_down_on_start():
         w.stop(timeout=1)
 
 
+@with_setup(_fixture.setup, _fixture.teardown)
 def test_handler_exception():
     # Event handler failures do not disrupt watch operation.
 
-    _proxied_clt.delete('/test')
+    proxied_clt = _fixture.proxied_clt()
     watch_queue = queue.Queue()
 
     handle_count = [0]
@@ -233,17 +249,17 @@ def test_handler_exception():
 
         watch_queue.put(e)
 
-    put_rs = _direct_clt.put('/test/foo', 'bar0')
-    w = _proxied_clt.new_watcher('/test/foo', spin_pause=0.2,
-                                 start_revision=put_rs.header.revision + 1,
-                                 event_handler=event_handler)
+    put_rs = _fixture.aux_clt().put('/test/foo', 'bar0')
+    w = proxied_clt.new_watcher('/test/foo', spin_pause=0.2,
+                                start_revision=put_rs.header.revision + 1,
+                                event_handler=event_handler)
     w.start()
     try:
         # When
-        _proxied_clt.put('/test/foo', 'bar1')
-        _proxied_clt.put('/test/foo', 'bar2')
-        _proxied_clt.put('/test/foo', 'bar3')
-        _proxied_clt.put('/test/foo', 'bar4')
+        proxied_clt.put('/test/foo', 'bar1')
+        proxied_clt.put('/test/foo', 'bar2')
+        proxied_clt.put('/test/foo', 'bar3')
+        proxied_clt.put('/test/foo', 'bar4')
 
         # Then
         events = _collect_events(watch_queue, timeout=3)

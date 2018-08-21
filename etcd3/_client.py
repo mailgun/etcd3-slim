@@ -1,23 +1,23 @@
 from __future__ import absolute_import
 
 import logging
+from random import shuffle
 from threading import Lock
 
 import grpc
+import six
 
 from etcd3 import _utils
 from etcd3._grpc_stubs.rpc_pb2 import (AuthStub, AuthenticateRequest,
-                                       DeleteRangeRequest, KVStub,
-                                       LeaseGrantRequest,
-                                       LeaseRevokeRequest, LeaseStub,
-                                       PutRequest, RangeRequest,
-                                       WatchStub)
+                                       ClusterStub, DeleteRangeRequest, KVStub,
+                                       LeaseGrantRequest, LeaseRevokeRequest,
+                                       LeaseStub, MemberListRequest, PutRequest,
+                                       RangeRequest, WatchStub)
 from etcd3._keep_aliver import KeepAliver
 from etcd3._watcher import Watcher
 
 _DEFAULT_ETCD_ENDPOINT = '127.0.0.1:23790'
 _DEFAULT_REQUEST_TIMEOUT = 1  # Seconds
-
 
 _log = logging.getLogger(__name__)
 
@@ -32,7 +32,14 @@ def _reconnect(f):
             try:
                 return f(*args, **kwargs)
 
-            except grpc.RpcError:
+            except grpc.RpcError as err:
+                severity = logging.ERROR
+                if (err.code() == grpc.StatusCode.UNAUTHENTICATED and
+                        err.details().endswith('invalid auth token')):
+                    severity = logging.WARN
+
+                _log.log(severity, 'Retrying error: %s(*%s, **%s)',
+                         f, args, kwargs, exc_info=True)
                 etcd3_clt._reset_grpc_channel()
                 return f(*args, **kwargs)
 
@@ -45,9 +52,9 @@ def _reconnect(f):
 
 class Client(object):
 
-    def __init__(self, endpoint, user, password, cert=None, cert_key=None,
+    def __init__(self, endpoints, user, password, cert=None, cert_key=None,
                  cert_ca=None, timeout=None):
-        self._endpoint = endpoint
+        self._endpoint_balancer = _EndpointBalancer(endpoints)
         self._user = user
         self._password = password
         self._ssl_creds = grpc.ssl_channel_credentials(
@@ -59,6 +66,13 @@ class Client(object):
         self._kv_stub = None
         self._watch_stub = None
         self._lease_stub = None
+
+        # For tests only!
+        self._skip_endpoint_discovery = False
+
+    @property
+    def current_endpoint(self):
+        return self._endpoint_balancer.current_endpoint
 
     @_reconnect
     def get(self, key, is_prefix=False):
@@ -122,6 +136,9 @@ class Client(object):
 
     def _ensure_grpc_channel(self):
         with self._grpc_channel_mu:
+            if self._grpc_channel:
+                return
+
             self._ensure_grpc_channel_unsafe()
 
     def _close_grpc_channel(self):
@@ -134,10 +151,15 @@ class Client(object):
             self._ensure_grpc_channel_unsafe()
 
     def _ensure_grpc_channel_unsafe(self):
-        if self._grpc_channel:
-            return
+        endpoint = self._endpoint_balancer.rotate_endpoint()
+        self._grpc_channel = self._dial(endpoint)
 
-        self._grpc_channel = self._dial()
+        if not self._skip_endpoint_discovery:
+            cluster_stub = ClusterStub(self._grpc_channel)
+            rs = cluster_stub.MemberList(MemberListRequest(),
+                                         timeout=self._timeout)
+            self._endpoint_balancer.refresh(rs.members, endpoint)
+
         self._kv_stub = KVStub(self._grpc_channel)
         self._watch_stub = WatchStub(self._grpc_channel)
         self._lease_stub = LeaseStub(self._grpc_channel)
@@ -152,16 +174,16 @@ class Client(object):
 
         self._grpc_channel = None
 
-    def _dial(self):
-        token = self._authenticate()
+    def _dial(self, endpoint):
+        token = self._authenticate(endpoint)
         token_plugin = _TokenAuthMetadataPlugin(token)
         token_creds = grpc.metadata_call_credentials(token_plugin)
         creds = grpc.composite_channel_credentials(self._ssl_creds,
                                                    token_creds)
-        return grpc.secure_channel(self._endpoint, creds)
+        return grpc.secure_channel(endpoint, creds)
 
-    def _authenticate(self):
-        grpc_channel = grpc.secure_channel(self._endpoint, self._ssl_creds)
+    def _authenticate(self, endpoint):
+        grpc_channel = grpc.secure_channel(endpoint, self._ssl_creds)
         try:
             auth_stub = AuthStub(grpc_channel)
             rq = AuthenticateRequest(
@@ -191,3 +213,49 @@ def _read_file(filename):
 
     with open(filename, 'rb') as f:
         return f.read()
+
+
+class _EndpointBalancer(object):
+
+    def __init__(self, endpoints):
+        self._mu = Lock()
+
+        if isinstance(endpoints, six.string_types):
+            endpoints = endpoints.split(',')
+
+        self._endpoints = [_normalize_endpoint(ep) for ep in endpoints]
+        shuffle(self._endpoints)
+
+    @property
+    def current_endpoint(self):
+        return self._endpoints[0]
+
+    def rotate_endpoint(self):
+        with self._mu:
+            rotated_endpoint = self._endpoints[0]
+            self._endpoints = self._endpoints[1:]
+            self._endpoints.append(rotated_endpoint)
+            return self._endpoints[0]
+
+    def refresh(self, members, current_endpoint):
+        with self._mu:
+            self._endpoints = []
+            for member in members:
+                if len(member.clientURLs) < 1:
+                    continue
+
+                endpoint = _normalize_endpoint(member.clientURLs[0])
+                if endpoint == current_endpoint:
+                    continue
+
+                self._endpoints.append(endpoint)
+
+            shuffle(self._endpoints)
+            # Ensure that current endpoint is the first in the list
+            self._endpoints.insert(0, current_endpoint)
+            _log.info('Endpoints refreshed: %s', self._endpoints)
+
+
+def _normalize_endpoint(ep):
+    parts = ep.lower().strip().split('//')
+    return parts[-1]

@@ -1,112 +1,87 @@
 from __future__ import absolute_import
 
+import re
+from contextlib import contextmanager
 from time import sleep
 
 import grpc
-import os
-import re
-from contextlib import contextmanager
-from nose.tools import eq_
+from nose.tools import eq_, with_setup, ok_, assert_not_equal
 
-from etcd3 import (ENV_ETCD3_CA, ENV_ETCD3_ENDPOINT, ENV_ETCD3_PASSWORD,
-                   ENV_ETCD3_USER, _utils)
-from etcd3._client import Client
-from tests.toxiproxy import ToxiProxyClient
-
-_ETCD_PROXY = 'etcd'
+from etcd3 import (_utils)
+from tests.etcd3 import _fixture
 
 
-def setup_module():
-    global _toxi_proxy_clt
-    _toxi_proxy_clt = ToxiProxyClient()
-    _toxi_proxy_clt.start()
-
-    etcd_endpoint = os.getenv(ENV_ETCD3_ENDPOINT, '127.0.0.1:2379')
-    user = os.getenv(ENV_ETCD3_USER, 'test')
-    password = os.getenv(ENV_ETCD3_PASSWORD, 'test')
-    cert_ca = os.getenv(ENV_ETCD3_CA, 'tests/fixtures/ca.pem')
-
-    proxy_spec = _toxi_proxy_clt.add_proxy(_ETCD_PROXY, etcd_endpoint)
-    proxy_endpoint = proxy_spec['listen']
-    # Make sure to access proxy via 127.0.0.1 otherwise TLS verification fails.
-    if proxy_endpoint.startswith('[::]:'):
-        proxy_endpoint = '127.0.0.1:' + proxy_endpoint[5:]
-
-    global _etcd3_clt
-    _etcd3_clt = Client(proxy_endpoint, user, password, cert_ca=cert_ca)
-
-
-def teardown_module():
-    _toxi_proxy_clt.stop()
-
-
+@with_setup(_fixture.setup, _fixture.teardown)
 def test_get_does_not_exist():
-    _etcd3_clt.delete('/test/', is_prefix=True)
+    proxied_clt = _fixture.proxied_clt()
 
     # When
-    rs = _etcd3_clt.get('/test/foo')
+    rs = proxied_clt.get('/test/foo')
 
     # Then
     _assert_get_one(None, rs)
 
 
+@with_setup(_fixture.setup, _fixture.teardown)
 def test_delete_one():
-    _etcd3_clt.delete('/test/', is_prefix=True)
+    proxied_clt = _fixture.proxied_clt()
 
-    _etcd3_clt.put('/test/foo1', 'bar1')
-    _etcd3_clt.put('/test/foo2', 'bar2')
-    _etcd3_clt.put('/test/foo21', 'bar3')
-    _etcd3_clt.put('/test/foo212', 'bar4')
-    _etcd3_clt.put('/test/foo3', 'bar5')
+    proxied_clt.put('/test/foo1', 'bar1')
+    proxied_clt.put('/test/foo2', 'bar2')
+    proxied_clt.put('/test/foo21', 'bar3')
+    proxied_clt.put('/test/foo212', 'bar4')
+    proxied_clt.put('/test/foo3', 'bar5')
 
     # When
-    rs = _etcd3_clt.delete('/test/foo2')
+    rs = proxied_clt.delete('/test/foo2')
 
     # Then
     eq_(1, rs.deleted)
-    _assert_get_one('bar1', _etcd3_clt.get('/test/foo1'))
-    _assert_get_one(None, _etcd3_clt.get('/test/foo2'))
-    _assert_get_one('bar3', _etcd3_clt.get('/test/foo21'))
-    _assert_get_one('bar4', _etcd3_clt.get('/test/foo212'))
-    _assert_get_one('bar5', _etcd3_clt.get('/test/foo3'))
+    _assert_get_one('bar1', proxied_clt.get('/test/foo1'))
+    _assert_get_one(None, proxied_clt.get('/test/foo2'))
+    _assert_get_one('bar3', proxied_clt.get('/test/foo21'))
+    _assert_get_one('bar4', proxied_clt.get('/test/foo212'))
+    _assert_get_one('bar5', proxied_clt.get('/test/foo3'))
 
 
+@with_setup(_fixture.setup, _fixture.teardown)
 def test_delete_range():
-    _etcd3_clt.delete('/test/', is_prefix=True)
+    proxied_clt = _fixture.proxied_clt()
 
-    _etcd3_clt.put('/test/foo1', 'bar1')
-    _etcd3_clt.put('/test/foo2', 'bar2')
-    _etcd3_clt.put('/test/foo21', 'bar3')
-    _etcd3_clt.put('/test/foo212', 'bar4')
-    _etcd3_clt.put('/test/foo3', 'bar5')
+    proxied_clt.put('/test/foo1', 'bar1')
+    proxied_clt.put('/test/foo2', 'bar2')
+    proxied_clt.put('/test/foo21', 'bar3')
+    proxied_clt.put('/test/foo212', 'bar4')
+    proxied_clt.put('/test/foo3', 'bar5')
 
     # When
-    rs = _etcd3_clt.delete('/test/foo2', is_prefix=True)
+    rs = proxied_clt.delete('/test/foo2', is_prefix=True)
 
     # Then
     eq_(3, rs.deleted)
-    _assert_get_one('bar1', _etcd3_clt.get('/test/foo1'))
-    _assert_get_one(None, _etcd3_clt.get('/test/foo2'))
-    _assert_get_one(None, _etcd3_clt.get('/test/foo21'))
-    _assert_get_one(None, _etcd3_clt.get('/test/foo212'))
-    _assert_get_one('bar5', _etcd3_clt.get('/test/foo3'))
+    _assert_get_one('bar1', proxied_clt.get('/test/foo1'))
+    _assert_get_one(None, proxied_clt.get('/test/foo2'))
+    _assert_get_one(None, proxied_clt.get('/test/foo21'))
+    _assert_get_one(None, proxied_clt.get('/test/foo212'))
+    _assert_get_one('bar5', proxied_clt.get('/test/foo3'))
 
 
+@with_setup(_fixture.setup, _fixture.teardown)
 def test_get_revisions():
     # Checks that create_revision and mod_revision are returned correctly.
 
-    _etcd3_clt.delete('/test')
+    proxied_clt = _fixture.proxied_clt()
 
     # Given
-    _etcd3_clt.put('/test/foo0', 'tox')
-    create_rs = _etcd3_clt.put('/test/foo', 'bar')
-    _etcd3_clt.put('/test/foo', 'bazz')
-    _etcd3_clt.put('/test/foo2', 'fox')
-    update_rs = _etcd3_clt.put('/test/foo', 'blah')
-    _etcd3_clt.put('/test/foo3', 'socks')
+    proxied_clt.put('/test/foo0', 'tox')
+    create_rs = proxied_clt.put('/test/foo', 'bar')
+    proxied_clt.put('/test/foo', 'bazz')
+    proxied_clt.put('/test/foo2', 'fox')
+    update_rs = proxied_clt.put('/test/foo', 'blah')
+    proxied_clt.put('/test/foo3', 'socks')
 
     # When
-    rs = _etcd3_clt.get('/test/foo')
+    rs = proxied_clt.get('/test/foo')
 
     # Then
     eq_(create_rs.header.revision, rs.kvs[0].create_revision)
@@ -114,17 +89,18 @@ def test_get_revisions():
     _assert_get_one('blah', rs)
 
 
+@with_setup(_fixture.setup, _fixture.teardown)
 def test_get_prefix():
-    _etcd3_clt.delete('/test/', is_prefix=True)
+    proxied_clt = _fixture.proxied_clt()
 
-    _etcd3_clt.put('/test/foo1', 'bar1')
-    _etcd3_clt.put('/test/foo2', 'bar2')
-    _etcd3_clt.put('/test/foo21', 'bar3')
-    _etcd3_clt.put('/test/foo212', 'bar4')
-    _etcd3_clt.put('/test/foo3', 'bar5')
+    proxied_clt.put('/test/foo1', 'bar1')
+    proxied_clt.put('/test/foo2', 'bar2')
+    proxied_clt.put('/test/foo21', 'bar3')
+    proxied_clt.put('/test/foo212', 'bar4')
+    proxied_clt.put('/test/foo3', 'bar5')
 
     # When
-    rs = _etcd3_clt.get('/test/foo2', is_prefix=True)
+    rs = proxied_clt.get('/test/foo2', is_prefix=True)
 
     # Then
     eq_(3, rs.count)
@@ -133,56 +109,112 @@ def test_get_prefix():
     eq_(b'bar4', rs.kvs[2].value)
 
 
-def test_auto_reconnect():
-    # After a server crash client restores connection with etcd automatically.
+@with_setup(_fixture.setup, _fixture.teardown)
+def test_endpoint_discovery():
+    direct_clt = _fixture.direct_clt()
 
-    _etcd3_clt.delete('/test')
+    first_endpoint = direct_clt.current_endpoint
+    eq_(1, len(direct_clt._endpoint_balancer._endpoints))
 
-    _etcd3_clt.put('/test/foo', 'bar')
-    _assert_get_one('bar', _etcd3_clt.get('/test/foo'))
+    # When: any operation triggers connection & discovery, might as well be get
+    direct_clt.get_value('/test/foo')
 
-    _toxi_proxy_clt.update_proxy(_ETCD_PROXY, enabled=False)
+    # Then: 3 endpoints are discovered.
+    discovered_endpoints = direct_clt._endpoint_balancer._endpoints
+    eq_(3, len(set(discovered_endpoints)))
+    # The position of the current endpoint is preserved.
+    eq_(first_endpoint, direct_clt.current_endpoint)
+    eq_(first_endpoint, discovered_endpoints[0])
+
+
+@with_setup(_fixture.setup, _fixture.teardown)
+def test_auto_reconnect_node():
+    # If a connection with current node is lost then the client automatically
+    # connects to another.
+
+    proxied_clt = _fixture.proxied_clt()
+
+    proxied_clt.put('/test/foo', 'bar')
+    _assert_get_one('bar', proxied_clt.get('/test/foo'))
+    orig_endpoint = proxied_clt.current_endpoint
+
+    i = 0
+    while True:
+        val = 'bazz%d' % (i,)
+        endpoint = proxied_clt.current_endpoint
+
+        # When
+        _fixture.disable_endpoint(endpoint)
+        try:
+
+            # Then
+            proxied_clt.put('/test/foo', val)
+
+            assert_not_equal(endpoint, proxied_clt.current_endpoint)
+            _assert_get_one(val, proxied_clt.get('/test/foo'))
+
+        finally:
+            _fixture.enable_endpoint(endpoint)
+
+        # Eventually we should cycle through all endpoints and get back to the
+        # origin.
+        if endpoint == orig_endpoint:
+            break
+
+
+@with_setup(_fixture.setup, _fixture.teardown)
+def test_auto_reconnect_outage():
+    # Connection is automatically restored even after a cluster wide outage.
+
+    proxied_clt = _fixture.proxied_clt()
+
+    proxied_clt.put('/test/foo', 'bar')
+    _assert_get_one('bar', proxied_clt.get('/test/foo'))
+
+    _fixture.disable_all_endpoints()
     with _assert_raises_grpc_error(grpc.StatusCode.UNAVAILABLE,
                                    '(OS Error)|'
                                    '(Socket closed)|'
                                    '(Transport closed)|'
                                    '(Connect Failed)'):
-        _etcd3_clt.put('/test/foo', 'bazz1')
+        proxied_clt.put('/test/foo', 'bazz1')
 
     # When: etcd gets back in service
-    _toxi_proxy_clt.update_proxy(_ETCD_PROXY, enabled=True)
+    _fixture.enabled_all_endpoints()
 
     # Then: client restores connection automatically
-    _etcd3_clt.put('/test/foo', 'bazz2')
-    _assert_get_one('bazz2', _etcd3_clt.get('/test/foo'))
+    proxied_clt.put('/test/foo', 'bazz2')
+    _assert_get_one('bazz2', proxied_clt.get('/test/foo'))
 
 
+@with_setup(_fixture.setup, _fixture.teardown)
 def test_lease_expires():
-    _etcd3_clt.delete('/test')
+    proxied_clt = _fixture.proxied_clt()
 
-    rs = _etcd3_clt.lease_grant(1)
-    _etcd3_clt.put('/test/foo', 'bar', rs.ID)
-    _assert_get_one('bar', _etcd3_clt.get('/test/foo'))
+    rs = proxied_clt.lease_grant(1)
+    proxied_clt.put('/test/foo', 'bar', rs.ID)
+    _assert_get_one('bar', proxied_clt.get('/test/foo'))
 
     # When
-    sleep(rs.TTL + 0.5)
+    sleep(rs.TTL + 1)
 
     # Then
-    _assert_get_one(None, _etcd3_clt.get('/test/foo'))
+    _assert_get_one(None, proxied_clt.get('/test/foo'))
 
 
+@with_setup(_fixture.setup, _fixture.teardown)
 def test_lease_revoke():
-    _etcd3_clt.delete('/test')
+    proxied_clt = _fixture.proxied_clt()
 
-    rs = _etcd3_clt.lease_grant(600)
-    _etcd3_clt.put('/test/foo', 'bar', rs.ID)
-    _assert_get_one('bar', _etcd3_clt.get('/test/foo'))
+    rs = proxied_clt.lease_grant(600)
+    proxied_clt.put('/test/foo', 'bar', rs.ID)
+    _assert_get_one('bar', proxied_clt.get('/test/foo'))
 
     # When
-    _etcd3_clt.lease_revoke(rs.ID)
+    proxied_clt.lease_revoke(rs.ID)
 
     # Then
-    _assert_get_one(None, _etcd3_clt.get('/test/foo'))
+    _assert_get_one(None, proxied_clt.get('/test/foo'))
 
 
 @contextmanager
