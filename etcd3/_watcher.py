@@ -4,6 +4,8 @@ import logging
 from threading import Thread
 from time import sleep
 
+import grpc
+
 from etcd3 import _utils
 from etcd3._grpc_bd_stream import GrpcBDStream
 from etcd3._grpc_stubs.rpc_pb2 import WatchCreateRequest, WatchRequest
@@ -84,6 +86,18 @@ class Watcher(object):
 
                         except Exception:
                             _log.exception('Event handler failed: %s', e)
+
+            except grpc.RpcError as err:
+                severity = logging.ERROR
+                # Cancelled error is raised when the underlying gRPC channel
+                # is reset by the client itself, when retrying a gRPC error. On
+                # the off-chance the error can be returned on another yet
+                # unknown reason, it is reported as warning rather then info.
+                if err.code() == grpc.StatusCode.CANCELLED:
+                    severity = logging.WARN
+
+                _log.log(severity, 'Watch stream failed: %s', self._key)
+                sleep(self._spin_pause)
 
             except Exception:
                 _log.exception('Watch stream failed: %s', self._key)

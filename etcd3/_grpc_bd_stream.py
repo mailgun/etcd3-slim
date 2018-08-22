@@ -74,6 +74,9 @@ class GrpcBDStream(object):
                 _log.info('Response discarded on close: %s, rs=%s',
                           self._name, rs)
 
+        # For an unknown reason the response iterator is not always terminated
+        # by gRPC when the request iterator is terminated by the client. That
+        # makes the response thread to hang, resulting in the following error.
         except queue.Empty:
             _log.warn('Timed out draining responses: %s', self._name)
 
