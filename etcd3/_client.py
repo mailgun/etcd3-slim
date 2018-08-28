@@ -17,7 +17,9 @@ from etcd3._keep_aliver import KeepAliver
 from etcd3._watcher import Watcher
 
 _DEFAULT_ETCD_ENDPOINT = '127.0.0.1:23790'
-_DEFAULT_REQUEST_TIMEOUT = 1  # Seconds
+# It was observed in production that during failovers timeouts are getting
+# really high. Thundering herd of reconnections is probably at play here.
+_DEFAULT_REQUEST_TIMEOUT = 30  # Seconds
 
 _log = logging.getLogger(__name__)
 
