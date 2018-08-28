@@ -24,3 +24,11 @@ E0820 22:02:35.823302859   14446 ssl_transport_security.cc:497] SSL_write failed
 
 See https://github.com/grpc/grpc/issues/15334 to follow updates to fork()
 support in gRPC.
+
+##### Dockerized Server For Local Development
+
+To build a Docker image with etcd server for local development:
+
+    $ ./build-docker.sh
+
+The image will be named `etcd3-slim-dev`.
