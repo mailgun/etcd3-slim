@@ -41,7 +41,7 @@ for i in $(seq 1 ${CLUSTER_SIZE}); do
     fi
     ${WORKSPACE_DIR}/${ETCD3_DIST}/etcd \
         --name="test${i}" \
-        --listen-client-urls="https://127.0.0.1:${client_port}" \
+        --listen-client-urls="https://0.0.0.0:${client_port}" \
         --advertise-client-urls="https://127.0.0.1:${client_port}" \
         --listen-peer-urls="http://127.0.0.1:${peer_port}" \
         --initial-advertise-peer-urls="http://127.0.0.1:${peer_port}" \
