@@ -5,18 +5,23 @@ from contextlib import contextmanager
 from time import sleep
 
 import grpc
-from nose.tools import eq_, with_setup, ok_, assert_not_equal, assert_raises
+from nose.tools import assert_not_equal, assert_raises_regexp, eq_, with_setup
 
-from etcd3 import _utils, Client
+from etcd3 import Client, _utils
 from tests.etcd3 import _fixture
 
 
 def test_user_password_inconsistent():
-    with assert_raises(AttributeError):
+    with assert_raises_regexp(AttributeError, 'Neither or both user and password should be specified'):
         Client(user='foo')
 
-    with assert_raises(AttributeError):
+    with assert_raises_regexp(AttributeError, 'Neither or both user and password should be specified'):
         Client(password='foo')
+
+
+def test_auth_no_tls():
+    with assert_raises_regexp(AttributeError, 'Authentication is only allowed via TLS'):
+        Client(user='foo', password='bar')
 
 
 @with_setup(_fixture.setup, _fixture.teardown)

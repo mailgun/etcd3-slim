@@ -3,7 +3,7 @@
 set -x
 
 SCRIPT_DIR="$(dirname $0)"
-source ${SCRIPT_DIR}/defaults.sh
+source ${SCRIPT_DIR}/common.sh
 
 KERNEL_NAME=$(uname -s | awk '{print tolower($0)}')
 ETCD3_DIST=etcd-${ETCD3_VERSION}-${KERNEL_NAME}-amd64
@@ -13,8 +13,6 @@ else
     ZIP=tar.gz
 fi
 ETCD3_ARCHIVE=${ETCD3_DIST}.${ZIP}
-FIXTURES_DIR=tests/fixtures
-WORKSPACE_DIR=tests/.workspace
 
 mkdir -p ${WORKSPACE_DIR}
 
@@ -32,6 +30,14 @@ if (( ${CLUSTER_SIZE} > 1 )); then
     done
 fi
 
+if [ "${ETCD3_TLS}" ]; then
+    CLIENT_PROTO="https"
+    TLS_PARAMS="--cert-file=${FIXTURES_DIR}/localhost.pem --key-file=${FIXTURES_DIR}/localhost-key.pem"
+else
+    CLIENT_PROTO="http"
+    TLS_PARAMS=""
+fi
+
 for i in $(seq 1 ${CLUSTER_SIZE}); do
     client_port="2379"
     peer_port="2380"
@@ -41,15 +47,14 @@ for i in $(seq 1 ${CLUSTER_SIZE}); do
     fi
     ${WORKSPACE_DIR}/${ETCD3_DIST}/etcd \
         --name="test${i}" \
-        --listen-client-urls="https://0.0.0.0:${client_port}" \
-        --advertise-client-urls="https://127.0.0.1:${client_port}" \
+        --listen-client-urls="${CLIENT_PROTO}://0.0.0.0:${client_port}" \
+        --advertise-client-urls="${CLIENT_PROTO}://127.0.0.1:${client_port}" \
         --listen-peer-urls="http://127.0.0.1:${peer_port}" \
         --initial-advertise-peer-urls="http://127.0.0.1:${peer_port}" \
         --initial-cluster=${INITIAL_CLUSTER} \
         --initial-cluster-state=new \
         --data-dir=${WORKSPACE_DIR}/data${i} \
-        --cert-file=${FIXTURES_DIR}/localhost.pem \
-        --key-file=${FIXTURES_DIR}/localhost-key.pem \
+        ${TLS_PARAMS} \
         &>${WORKSPACE_DIR}/etcd${i}.log \
         &
 

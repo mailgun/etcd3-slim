@@ -55,13 +55,14 @@ def _reconnect(f):
 class Client(object):
 
     def __init__(self, endpoints=None, user=None, password=None, timeout=None,
-                 cert=None, cert_key=None, cert_ca=None):
-        endpoints = endpoints or [_DEFAULT_ETCD_ENDPOINT]
+                 cert=None, cert_key=None, cert_ca=None, with_tls=False):
+        endpoints = endpoints or _DEFAULT_ETCD_ENDPOINT
         self._endpoint_balancer = _EndpointBalancer(endpoints)
+        self._tls_creds = _new_tls_creds(cert, cert_key, cert_ca, with_tls)
         self._auth_rq = _new_auth_rq(user, password)
+        if self._auth_rq and not self._tls_creds:
+            raise AttributeError('Authentication is only allowed via TLS')
 
-        self._ssl_creds = grpc.ssl_channel_credentials(
-            _read_file(cert_ca), _read_file(cert_key), _read_file(cert))
         self._timeout = timeout or _DEFAULT_REQUEST_TIMEOUT
 
         self._grpc_channel_mu = Lock()
@@ -178,19 +179,22 @@ class Client(object):
         self._grpc_channel = None
 
     def _dial(self, endpoint):
+        if not self._tls_creds:
+            return grpc.insecure_channel(endpoint)
+
         if self._auth_rq:
             token = self._authenticate(endpoint)
             token_plugin = _TokenAuthMetadataPlugin(token)
             token_creds = grpc.metadata_call_credentials(token_plugin)
-            creds = grpc.composite_channel_credentials(self._ssl_creds,
+            creds = grpc.composite_channel_credentials(self._tls_creds,
                                                        token_creds)
         else:
-            creds = self._ssl_creds
+            creds = self._tls_creds
 
         return grpc.secure_channel(endpoint, creds)
 
     def _authenticate(self, endpoint):
-        grpc_channel = grpc.secure_channel(endpoint, self._ssl_creds)
+        grpc_channel = grpc.secure_channel(endpoint, self._tls_creds)
         try:
             auth_stub = AuthStub(grpc_channel)
             rs = auth_stub.Authenticate(self._auth_rq, timeout=self._timeout)
@@ -218,6 +222,18 @@ def _new_auth_rq(user, password):
         return None
 
     return AuthenticateRequest(name=user, password=password)
+
+
+def _new_tls_creds(cert, cert_key, cert_ca, with_tls):
+    if not cert and not cert_key and not cert_ca and not with_tls:
+        return None
+
+    if bool(cert) != bool(cert_key):
+        raise AttributeError('Neither or both cert and cert_key '
+                             'should be specified')
+
+    return grpc.ssl_channel_credentials(
+        _read_file(cert_ca), _read_file(cert_key), _read_file(cert))
 
 
 def _read_file(filename):
