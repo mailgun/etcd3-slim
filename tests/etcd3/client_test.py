@@ -5,10 +5,18 @@ from contextlib import contextmanager
 from time import sleep
 
 import grpc
-from nose.tools import eq_, with_setup, ok_, assert_not_equal
+from nose.tools import eq_, with_setup, ok_, assert_not_equal, assert_raises
 
-from etcd3 import (_utils)
+from etcd3 import _utils, Client
 from tests.etcd3 import _fixture
+
+
+def test_user_password_inconsistent():
+    with assert_raises(AttributeError):
+        Client(user='foo')
+
+    with assert_raises(AttributeError):
+        Client(password='foo')
 
 
 @with_setup(_fixture.setup, _fixture.teardown)

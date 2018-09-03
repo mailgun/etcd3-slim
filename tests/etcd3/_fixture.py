@@ -13,8 +13,8 @@ def setup():
     _toxi_proxy_clt.start()
 
     seed_endpoint = os.getenv(ENV_ETCD3_ENDPOINT, '127.0.0.1:2379')
-    user = os.getenv(ENV_ETCD3_USER, 'test')
-    password = os.getenv(ENV_ETCD3_PASSWORD, 'test')
+    user = os.getenv(ENV_ETCD3_USER)
+    password = os.getenv(ENV_ETCD3_PASSWORD)
     cert_ca = os.getenv(ENV_ETCD3_CA, 'tests/fixtures/ca.pem')
 
     global _direct_clt

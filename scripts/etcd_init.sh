@@ -12,10 +12,12 @@ ETCD3_DIST=etcd-${ETCD3_VERSION}-${KERNEL_NAME}-amd64
 WORKSPACE_DIR=tests/.workspace
 ETCDCTL="${WORKSPACE_DIR}/${ETCD3_DIST}/etcdctl --endpoints=https://127.0.0.1:2379 --insecure-transport=false --insecure-skip-tls-verify=true"
 
-${ETCDCTL} role add test
-${ETCDCTL} user add root:root
-${ETCDCTL} user add test:test
-${ETCDCTL} user grant-role test test
-${ETCDCTL} role grant-permission test --prefix=true readwrite /
-${ETCDCTL} auth enable
-${ETCDCTL} --user test:test get / --prefix=true
+if [ "${ETCD3_USER}" ]; then
+    ${ETCDCTL} role add ${ETCD3_USER}
+    ${ETCDCTL} user add root:root
+    ${ETCDCTL} user add ${ETCD3_USER}:${ETCD3_PASSWORD}
+    ${ETCDCTL} user grant-role ${ETCD3_USER} ${ETCD3_USER}
+    ${ETCDCTL} role grant-permission ${ETCD3_USER} --prefix=true readwrite /
+    ${ETCDCTL} auth enable
+    ${ETCDCTL} --user ${ETCD3_USER}:${ETCD3_PASSWORD} get / --prefix=true
+fi

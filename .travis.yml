@@ -4,8 +4,8 @@ python:
   - 3.6
 env:
   matrix:
-    - ETCD3_VERSION=v3.2.23
-    - ETCD3_VERSION=v3.3.8
+    - ETCD3_VERSION=v3.3.9  ETCD3_USER=test
+    - ETCD3_VERSION=v3.3.9  ETCD3_USER=""
 
 before_install:
   - ./scripts/etcd_start.sh
