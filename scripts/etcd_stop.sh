@@ -3,9 +3,7 @@
 set -x
 
 SCRIPT_DIR="$(dirname $0)"
-source ${SCRIPT_DIR}/defaults.sh
-
-WORKSPACE_DIR=tests/.workspace
+source ${SCRIPT_DIR}/common.sh
 
 for i in $(seq 1 ${CLUSTER_SIZE}); do
     kill $(cat ${WORKSPACE_DIR}/etcd${i}.pid)

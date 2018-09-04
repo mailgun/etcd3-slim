@@ -16,7 +16,7 @@ from etcd3._grpc_stubs.rpc_pb2 import (AuthStub, AuthenticateRequest,
 from etcd3._keep_aliver import KeepAliver
 from etcd3._watcher import Watcher
 
-_DEFAULT_ETCD_ENDPOINT = '127.0.0.1:23790'
+_DEFAULT_ETCD_ENDPOINT = '127.0.0.1:2379'
 # It was observed in production that during failovers timeouts are getting
 # really high. Thundering herd of reconnections is probably at play here.
 _DEFAULT_REQUEST_TIMEOUT = 30  # Seconds
@@ -54,13 +54,15 @@ def _reconnect(f):
 
 class Client(object):
 
-    def __init__(self, endpoints, user, password, cert=None, cert_key=None,
-                 cert_ca=None, timeout=None):
+    def __init__(self, endpoints=None, user=None, password=None, timeout=None,
+                 cert=None, cert_key=None, cert_ca=None, with_tls=False):
+        endpoints = endpoints or _DEFAULT_ETCD_ENDPOINT
         self._endpoint_balancer = _EndpointBalancer(endpoints)
-        self._user = user
-        self._password = password
-        self._ssl_creds = grpc.ssl_channel_credentials(
-            _read_file(cert_ca), _read_file(cert_key), _read_file(cert))
+        self._tls_creds = _new_tls_creds(cert, cert_key, cert_ca, with_tls)
+        self._auth_rq = _new_auth_rq(user, password)
+        if self._auth_rq and not self._tls_creds:
+            raise AttributeError('Authentication is only allowed via TLS')
+
         self._timeout = timeout or _DEFAULT_REQUEST_TIMEOUT
 
         self._grpc_channel_mu = Lock()
@@ -177,22 +179,25 @@ class Client(object):
         self._grpc_channel = None
 
     def _dial(self, endpoint):
-        token = self._authenticate(endpoint)
-        token_plugin = _TokenAuthMetadataPlugin(token)
-        token_creds = grpc.metadata_call_credentials(token_plugin)
-        creds = grpc.composite_channel_credentials(self._ssl_creds,
-                                                   token_creds)
+        if not self._tls_creds:
+            return grpc.insecure_channel(endpoint)
+
+        if self._auth_rq:
+            token = self._authenticate(endpoint)
+            token_plugin = _TokenAuthMetadataPlugin(token)
+            token_creds = grpc.metadata_call_credentials(token_plugin)
+            creds = grpc.composite_channel_credentials(self._tls_creds,
+                                                       token_creds)
+        else:
+            creds = self._tls_creds
+
         return grpc.secure_channel(endpoint, creds)
 
     def _authenticate(self, endpoint):
-        grpc_channel = grpc.secure_channel(endpoint, self._ssl_creds)
+        grpc_channel = grpc.secure_channel(endpoint, self._tls_creds)
         try:
             auth_stub = AuthStub(grpc_channel)
-            rq = AuthenticateRequest(
-                name=self._user,
-                password=self._password
-            )
-            rs = auth_stub.Authenticate(rq, timeout=self._timeout)
+            rs = auth_stub.Authenticate(self._auth_rq, timeout=self._timeout)
             return rs.token
 
         finally:
@@ -207,6 +212,28 @@ class _TokenAuthMetadataPlugin(grpc.AuthMetadataPlugin):
     def __call__(self, context, callback):
         metadata = (('token', self._token),)
         callback(metadata, None)
+
+
+def _new_auth_rq(user, password):
+    if bool(user) != bool(password):
+        raise AttributeError('Neither or both user and password '
+                             'should be specified')
+    if not user:
+        return None
+
+    return AuthenticateRequest(name=user, password=password)
+
+
+def _new_tls_creds(cert, cert_key, cert_ca, with_tls):
+    if not cert and not cert_key and not cert_ca and not with_tls:
+        return None
+
+    if bool(cert) != bool(cert_key):
+        raise AttributeError('Neither or both cert and cert_key '
+                             'should be specified')
+
+    return grpc.ssl_channel_credentials(
+        _read_file(cert_ca), _read_file(cert_key), _read_file(cert))
 
 
 def _read_file(filename):

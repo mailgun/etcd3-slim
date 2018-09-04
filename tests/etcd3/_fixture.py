@@ -2,8 +2,7 @@ from __future__ import absolute_import
 
 import os
 
-from etcd3 import (Client, ENV_ETCD3_CA, ENV_ETCD3_ENDPOINT, ENV_ETCD3_PASSWORD,
-                   ENV_ETCD3_USER)
+from etcd3 import Client, ENV_ETCD3_ENDPOINT, ENV_ETCD3_TLS, ENV_ETCD3_USER
 from tests.toxiproxy import ToxiProxyClient
 
 
@@ -12,14 +11,16 @@ def setup():
     _toxi_proxy_clt = ToxiProxyClient()
     _toxi_proxy_clt.start()
 
-    seed_endpoint = os.getenv(ENV_ETCD3_ENDPOINT, '127.0.0.1:2379')
-    user = os.getenv(ENV_ETCD3_USER, 'test')
-    password = os.getenv(ENV_ETCD3_PASSWORD, 'test')
-    cert_ca = os.getenv(ENV_ETCD3_CA, 'tests/fixtures/ca.pem')
+    seed_endpoint = os.getenv(ENV_ETCD3_ENDPOINT)
+    user = os.getenv(ENV_ETCD3_USER)
+    password = user  # That is how the test etcd cluster is configured.
+
+    cert_ca = None
+    if os.getenv(ENV_ETCD3_TLS):
+        cert_ca = 'tests/fixtures/ca.pem'
 
     global _direct_clt
     _direct_clt = Client(seed_endpoint, user, password, cert_ca=cert_ca)
-
     global _aux_clt
     _aux_clt = Client(seed_endpoint, user, password, cert_ca=cert_ca)
 
