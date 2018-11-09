@@ -8,6 +8,7 @@ import grpc
 from nose.tools import assert_not_equal, assert_raises_regexp, eq_, with_setup
 
 from etcd3 import Client, _utils
+from etcd3._client import SortOrder, SortTarget
 from tests.etcd3 import _fixture
 
 
@@ -117,9 +118,72 @@ def test_get_prefix():
 
     # Then
     eq_(3, rs.count)
+    eq_(3, len(rs.kvs))
     eq_(b'bar2', rs.kvs[0].value)
     eq_(b'bar3', rs.kvs[1].value)
     eq_(b'bar4', rs.kvs[2].value)
+
+
+@with_setup(_fixture.setup, _fixture.teardown)
+def test_get_prefix_limit():
+    proxied_clt = _fixture.proxied_clt()
+
+    proxied_clt.put('/test/foo1', 'bar5')
+    proxied_clt.put('/test/foo2', 'bar4')
+    proxied_clt.put('/test/foo21', 'bar3')
+    proxied_clt.put('/test/foo212', 'bar2')
+    proxied_clt.put('/test/foo3', 'bar1')
+
+    # When
+    rs = proxied_clt.get('/test/foo', is_prefix=True, limit=2)
+
+    # Then
+    eq_(5, rs.count)
+    eq_(2, len(rs.kvs))
+
+
+@with_setup(_fixture.setup, _fixture.teardown)
+def test_get_prefix_sort():
+    proxied_clt = _fixture.proxied_clt()
+
+    proxied_clt.put('/test/foo212', 'bar4')
+    proxied_clt.put('/test/foo2', 'bar2')
+    proxied_clt.put('/test/foo3', 'bar1')
+    proxied_clt.put('/test/foo1', 'bar5')
+    proxied_clt.put('/test/foo21', 'bar3')
+
+    for i, tc in enumerate([{
+        'order': SortOrder.ASCEND,
+        'target': SortTarget.KEY,
+        'out': [b'bar5', b'bar2', b'bar3', b'bar4', b'bar1'],
+    }, {
+        'order': SortOrder.ASCEND,
+        'target': SortTarget.VALUE,
+        'out': [b'bar1', b'bar2', b'bar3', b'bar4', b'bar5'],
+    }, {
+        'order': SortOrder.ASCEND,
+        'target': SortTarget.CREATE_REVISION,
+        'out': [b'bar4', b'bar2', b'bar1', b'bar5', b'bar3'],
+    }, {
+        'order': SortOrder.DESCEND,
+        'target': SortTarget.KEY,
+        'out': [b'bar1', b'bar4', b'bar3', b'bar2', b'bar5'],
+    }, {
+        'order': SortOrder.DESCEND,
+        'target': SortTarget.VALUE,
+        'out': [b'bar5', b'bar4', b'bar3', b'bar2', b'bar1'],
+    }, {
+        'order': SortOrder.DESCEND,
+        'target': SortTarget.CREATE_REVISION,
+        'out': [b'bar3', b'bar5', b'bar1', b'bar2', b'bar4'],
+    }]):
+        print('Test case #%d: %s/%s', i, tc['order'], tc['target'])
+
+        # When
+        rs = proxied_clt.get('/test/foo', is_prefix=True,
+                             sort_order=tc['order'], sort_target=tc['target'])
+        # Then
+        eq_(tc['out'], [kv.value for kv in rs.kvs])
 
 
 @with_setup(_fixture.setup, _fixture.teardown)

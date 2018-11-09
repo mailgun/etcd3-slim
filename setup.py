@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(name='etcd3-slim',
-      version='0.1.11',
+      version='0.2.0',
       description='Thin Etcd3 client',
       long_description=open('README.md').read(),
       classifiers=[
@@ -30,6 +30,7 @@ setup(name='etcd3-slim',
           'requests'
       ],
       install_requires=[
+          'enum34',
           'grpcio',
           'protobuf',
           'six'
