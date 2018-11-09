@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import os
 
-from etcd3._client import Client
+from etcd3._client import Client, SortOrder, SortTarget
 
 ENV_ETCD3_CA = 'ETCD3_CA'
 ENV_ETCD3_ENDPOINT = 'ETCD3_ENDPOINT'
@@ -14,7 +14,9 @@ ENV_ETCD3_TLS_KEY = 'ETCD3_TLS_KEY'
 
 
 __all__ = [
-    'Client'
+    'Client',
+    'SortOrder',
+    'SortTarget'
 ]
 
 _clt = None
