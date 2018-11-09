@@ -6,6 +6,7 @@ from threading import Lock
 
 import grpc
 import six
+from enum import Enum
 
 from etcd3 import _utils
 from etcd3._grpc_stubs.rpc_pb2 import (AuthStub, AuthenticateRequest,
@@ -22,6 +23,20 @@ _DEFAULT_ETCD_ENDPOINT = '127.0.0.1:2379'
 _DEFAULT_REQUEST_TIMEOUT = 30  # Seconds
 
 _log = logging.getLogger(__name__)
+
+
+class SortOrder(Enum):
+    NONE = 0
+    ASCEND = 1
+    DESCEND =2
+
+
+class SortTarget(Enum):
+    KEY = 0
+    VERSION = 1
+    CREATE_REVISION = 2
+    MOD_REVISION = 3
+    VALUE = 4
 
 
 def _reconnect(f):
@@ -79,8 +94,12 @@ class Client(object):
         return self._endpoint_balancer.current_endpoint
 
     @_reconnect
-    def get(self, key, is_prefix=False):
-        rq = RangeRequest(key=_utils.to_bytes(key))
+    def get(self, key, is_prefix=False, limit=0,
+            sort_order=SortOrder.NONE, sort_target=SortTarget.KEY):
+        rq = RangeRequest(key=_utils.to_bytes(key),
+                          limit=limit,
+                          sort_order=sort_order.value,
+                          sort_target=sort_target.value)
         if is_prefix:
             rq.range_end = _utils.range_end(rq.key)
 
