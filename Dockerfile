@@ -4,7 +4,7 @@ WORKDIR /work
 
 RUN \
     apk update && \
-    apk add bash
+    apk add bash curl tar gzip
 
 COPY . \
     /work/
