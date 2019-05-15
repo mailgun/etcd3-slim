@@ -30,7 +30,7 @@ setup(name='etcd3-slim',
           'requests'
       ],
       install_requires=[
-          'enum34',
+          'enum34;python_version<"3.4"',
           'grpcio',
           'protobuf',
           'six'
