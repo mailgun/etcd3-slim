@@ -1,7 +1,9 @@
+dist: xenial
 language: python
 python:
   - 2.7
   - 3.6
+  - 3.7
 env:
   matrix:
     - ETCD3_VERSION=v3.3.10  ETCD3_TLS=""   ETCD3_USER=""
