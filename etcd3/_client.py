@@ -201,14 +201,15 @@ class Client(object):
         if not self._tls_creds:
             return grpc.insecure_channel(endpoint)
 
+        creds = self._tls_creds
+
         if self._auth_rq:
             token = self._authenticate(endpoint)
-            token_plugin = _TokenAuthMetadataPlugin(token)
-            token_creds = grpc.metadata_call_credentials(token_plugin)
-            creds = grpc.composite_channel_credentials(self._tls_creds,
-                                                       token_creds)
-        else:
-            creds = self._tls_creds
+            if token:
+                token_plugin = _TokenAuthMetadataPlugin(token)
+                token_creds = grpc.metadata_call_credentials(token_plugin)
+                creds = grpc.composite_channel_credentials(self._tls_creds,
+                                                           token_creds)
 
         return grpc.secure_channel(endpoint, creds)
 
@@ -218,7 +219,11 @@ class Client(object):
             auth_stub = AuthStub(grpc_channel)
             rs = auth_stub.Authenticate(self._auth_rq, timeout=self._timeout)
             return rs.token
-
+        except grpc.RpcError as e:
+            if "authentication is not enabled" in e.details():
+                _log.error("server authentication disabled; skipping")
+                return None
+            raise
         finally:
             grpc_channel.close()
 
