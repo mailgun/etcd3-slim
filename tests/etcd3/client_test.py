@@ -253,7 +253,8 @@ def test_auto_reconnect_outage():
                                    '(OS Error)|'
                                    '(Socket closed)|'
                                    '(Transport closed)|'
-                                   '(Connect Failed)'):
+                                   '(Connect Failed)|'
+                                   '(failed to connect to all addresses)'):
         proxied_clt.put('/test/foo', 'bazz1')
 
     # When: etcd gets back in service
