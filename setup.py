@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(name='etcd3-slim',
-      version='0.2.4',
+      version='1.0.0',
       description='Thin Etcd3 client',
       long_description=open('README.md').read(),
       classifiers=[
@@ -21,17 +21,21 @@ setup(name='etcd3-slim',
       author_email='admin@mailgunhq.com',
       url='https://www.mailgun.com/',
       license='Apache 2',
+      python_requires='>=3.9.6',
       packages=find_packages(exclude=['tests']),
       include_package_data=True,
       zip_safe=True,
-      tests_require=[
-          'nose',
-          'coverage',
-          'requests'
-      ],
+      extras_require={
+          'tests': [
+              'nose',
+              'coverage',
+              'requests'
+          ]
+      },
       install_requires=[
           'enum34',
           'grpcio',
           'protobuf',
           'six'
-      ])
+      ]
+)
