@@ -105,3 +105,4 @@ venv.bak/
 
 .idea
 tests/.workspace/
+/proto_vendor/
