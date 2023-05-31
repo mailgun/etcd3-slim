@@ -1,20 +1,18 @@
-from __future__ import absolute_import
-
 import logging
+from enum import Enum
 from random import shuffle
 from threading import Lock
 
 import grpc
-import six
-from enum import Enum
 
 from etcd3 import _utils
-from etcd3._grpc_stubs.rpc_pb2 import (AuthStub, AuthenticateRequest,
-                                       ClusterStub, DeleteRangeRequest, KVStub,
-                                       LeaseGrantRequest, LeaseRevokeRequest,
-                                       LeaseStub, MemberListRequest, PutRequest,
-                                       RangeRequest, WatchStub)
 from etcd3._keep_aliver import KeepAliver
+from etcd3._protobuf.rpc_pb2 import (AuthenticateRequest, DeleteRangeRequest,
+                                     LeaseGrantRequest, LeaseRevokeRequest,
+                                     MemberListRequest, PutRequest,
+                                     RangeRequest)
+from etcd3._protobuf.rpc_pb2_grpc import (AuthStub, ClusterStub, LeaseStub,
+                                          WatchStub, KVStub)
 from etcd3._watcher import Watcher
 
 _DEFAULT_ETCD_ENDPOINT = '127.0.0.1:2379'
@@ -273,7 +271,7 @@ class _EndpointBalancer(object):
     def __init__(self, endpoints):
         self._mu = Lock()
 
-        if isinstance(endpoints, six.string_types):
+        if isinstance(endpoints, str):
             endpoints = endpoints.split(',')
 
         self._endpoints = [_normalize_endpoint(ep) for ep in endpoints]

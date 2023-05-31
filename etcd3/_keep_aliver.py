@@ -1,11 +1,9 @@
-from __future__ import absolute_import
-
 import logging
 from threading import Thread
 from time import sleep, time
 
 from etcd3._grpc_bd_stream import GrpcBDStream
-from etcd3._grpc_stubs.rpc_pb2 import LeaseKeepAliveRequest
+from etcd3._protobuf.rpc_pb2 import LeaseKeepAliveRequest
 
 _DEFAULT_SPIN_PAUSE = 3  # seconds
 

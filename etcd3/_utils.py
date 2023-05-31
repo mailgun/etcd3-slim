@@ -1,11 +1,10 @@
-import six
 
 
 def to_bytes(val):
-    if isinstance(val, six.text_type):
+    if isinstance(val, str):
         return val.encode('utf-8')
 
-    if not isinstance(val, six.binary_type):
+    if not isinstance(val, bytes):
         raise TypeError('Unexpected type %s of %s' % (type(val), val))
 
     return val
@@ -14,4 +13,4 @@ def to_bytes(val):
 def range_end(key):
     ba = bytearray(key)
     ba[-1] = ba[-1] + 1
-    return six.binary_type(ba)
+    return bytes(ba)
