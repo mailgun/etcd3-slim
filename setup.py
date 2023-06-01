@@ -3,15 +3,13 @@
 from setuptools import setup, find_packages
 
 setup(name='etcd3-slim',
-      version='0.2.4',
+      version='0.3.0',
       description='Thin Etcd3 client',
       long_description=open('README.md').read(),
       classifiers=[
           'Development Status :: 4 - Beta',
           'Intended Audience :: Developers',
           'License :: OSI Approved :: Apache Software License',
-          'Programming Language :: Python :: 2',
-          'Programming Language :: Python :: 2.7',
           'Programming Language :: Python :: 3',
           'Programming Language :: Python :: 3.6',
           'Topic :: Software Development :: Libraries',
@@ -30,8 +28,7 @@ setup(name='etcd3-slim',
           'requests'
       ],
       install_requires=[
-          'enum34',
+          'google-api-python-client',
           'grpcio',
           'protobuf',
-          'six'
       ])

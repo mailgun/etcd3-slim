@@ -1,9 +1,6 @@
-from __future__ import absolute_import
-
 import logging
 import threading
-
-from six.moves import queue
+import queue
 
 _log = logging.getLogger(__name__)
 

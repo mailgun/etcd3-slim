@@ -6,7 +6,7 @@ from nose.tools import eq_, with_setup, assert_not_equal
 from six.moves import queue
 
 from etcd3 import _utils
-from etcd3._grpc_stubs.kv_pb2 import Event
+from etcd3._protobuf.kv_pb2 import Event
 from tests.etcd3 import _fixture
 
 

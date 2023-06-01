@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import logging
 from threading import Thread
 from time import sleep
@@ -8,7 +6,7 @@ import grpc
 
 from etcd3 import _utils
 from etcd3._grpc_bd_stream import GrpcBDStream
-from etcd3._grpc_stubs.rpc_pb2 import WatchCreateRequest, WatchRequest
+from etcd3._protobuf.rpc_pb2 import WatchCreateRequest, WatchRequest
 
 _DEFAULT_SPIN_PAUSE = 3  # seconds
 
